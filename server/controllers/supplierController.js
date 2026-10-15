@@ -1,0 +1,36 @@
+// -----------------------------------------------------------------------------
+//  Supplier controller — thin HTTP layer (parse req -> call service -> respond).
+// -----------------------------------------------------------------------------
+const service = require('../services/supplierService');
+const { sendSuccess, sendCreated } = require('../utils/response');
+const asyncHandler = require('../utils/asyncHandler');
+
+const actorOf = (req) => ({ id: req.user?.id, ip: req.ip });
+
+const list = asyncHandler(async (req, res) => {
+  const { search = '', isActive = null, page = 1, pageSize = 10 } = req.query;
+  const data = await service.list({ search, isActive, page: Number(page), pageSize: Number(pageSize) });
+  return sendSuccess(res, { message: 'Suppliers retrieved', data: data.items, meta: data.meta });
+});
+
+const getById = asyncHandler(async (req, res) => {
+  const supplier = await service.getById(req.params.id);
+  return sendSuccess(res, { message: 'Supplier retrieved', data: { supplier } });
+});
+
+const create = asyncHandler(async (req, res) => {
+  const supplier = await service.create(req.body, actorOf(req));
+  return sendCreated(res, { message: 'Supplier created', data: { supplier } });
+});
+
+const update = asyncHandler(async (req, res) => {
+  const supplier = await service.update(req.params.id, req.body, actorOf(req));
+  return sendSuccess(res, { message: 'Supplier updated', data: { supplier } });
+});
+
+const remove = asyncHandler(async (req, res) => {
+  await service.remove(req.params.id, actorOf(req));
+  return sendSuccess(res, { message: 'Supplier deactivated' });
+});
+
+module.exports = { list, getById, create, update, remove };
