@@ -31,6 +31,9 @@ function renderTable(container, { columns, rows, actions = [] }) {
     }).join('');
 
     const actionBtns = actions.map((a, ai) => {
+      // Optional per-row visibility: an action with a show(row) predicate that
+      // returns false is skipped for this row (e.g. "Issue" only on draft rows).
+      if (a.show && !a.show(row)) return '';
       const label = typeof a.label === 'function' ? a.label(row) : a.label;
       const cls = typeof a.className === 'function' ? a.className(row) : (a.className || 'btn-secondary');
       return `<button class="btn btn-sm ${cls}" data-row="${i}" data-action="${ai}">${escapeHtml(label)}</button>`;

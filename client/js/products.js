@@ -12,9 +12,10 @@ if (content) {
   const columns = [
     { key: 'sku', label: bi('SKU', 'رمز المنتج'), render: (v) => `<span class="mono">${escapeHtml(v)}</span>` },
     { key: 'name', label: bi('Name', 'الاسم') },
-    { key: 'unit', label: bi('Unit', 'الوحدة'), render: (v) => escapeHtml(v || '—') },
-    { key: 'selling_price', label: bi('Selling Price', 'سعر البيع'), numeric: true, render: (v) => formatMoney(v) },
-    { key: 'cost_price', label: bi('Cost Price', 'سعر التكلفة'), numeric: true, render: (v) => formatMoney(v) },
+    { key: 'unit', label: bi('Unit', 'الوحدة', 'واحد'), render: (v) => escapeHtml(v || '—') },
+    { key: 'stock_quantity', label: bi('In Stock', 'المتوفر', 'موجود'), numeric: true, render: (v) => `<span class="mono">${escapeHtml(String(Number(v)))}</span>` },
+    { key: 'selling_price', label: bi('Selling Price', 'سعر البيع', 'قیمت فروش'), numeric: true, render: (v) => formatMoney(v) },
+    { key: 'cost_price', label: bi('Cost Price', 'سعر التكلفة', 'قیمت تمام‌شده'), numeric: true, render: (v) => formatMoney(v) },
     { key: 'is_active', label: bi('Status', 'الحالة'), render: (v) => `<span class="status ${v ? 'active' : 'deactivated'}">${escapeHtml(v ? bi('Active', 'نشط') : bi('Inactive', 'غير نشط'))}</span>` },
   ];
 

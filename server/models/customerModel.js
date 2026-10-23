@@ -58,7 +58,7 @@ const codeExists = async (code, excludeId = null) => {
   return rows.length > 0;
 };
 
-const create = async (data) => {
+const create = async (data, executor = pool) => {
   const sql = `
     INSERT INTO customers
       (customer_code, name, email, phone, address, credit_limit, opening_balance, account_id)
@@ -68,7 +68,7 @@ const create = async (data) => {
     data.address || null, data.creditLimit ?? '0.00', data.openingBalance ?? '0.00',
     data.accountId || null,
   ];
-  const [result] = await pool.query(sql, params);
+  const [result] = await executor.query(sql, params);
   return result.insertId;
 };
 
@@ -76,12 +76,12 @@ const create = async (data) => {
  * Partial update — only the provided fields are changed.
  * Column names are whitelisted by the caller, never taken from raw input.
  */
-const update = async (id, fields) => {
+const update = async (id, fields, executor = pool) => {
   const keys = Object.keys(fields);
   if (keys.length === 0) return false;
   const setSql = keys.map((k) => `${k} = ?`).join(', ');
   const params = [...Object.values(fields), id];
-  await pool.query(`UPDATE customers SET ${setSql} WHERE id = ?`, params);
+  await executor.query(`UPDATE customers SET ${setSql} WHERE id = ?`, params);
   return true;
 };
 

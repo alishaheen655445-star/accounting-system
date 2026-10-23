@@ -11,7 +11,7 @@
 const content = renderLayout('dashboard', bi('Dashboard', 'لوحة التحكم'));
 if (content) loadStats();
 
-const CURRENCY = bi('SAR', 'ر.س');
+const CURRENCY = currencyCode();
 const fmtMoney = (v) => formatMoney(v);
 
 async function loadStats() {

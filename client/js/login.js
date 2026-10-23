@@ -21,14 +21,13 @@ function syncLoginThemeIcon() {
 if (themeBtn) themeBtn.addEventListener('click', () => { toggleTheme(); syncLoginThemeIcon(); });
 syncLoginThemeIcon();
 
-// Language toggle: translate all static labels and show the switch-to language.
+// Language menu (English / العربية / فارسی); the toggle shows the current language.
 function syncLoginLang() {
   applyStaticI18n(document);
   const label = document.getElementById('login-lang-label');
-  if (label) label.textContent = getLang() === 'ar' ? 'English' : 'العربية';
+  if (label) label.textContent = langNative(getLang());
 }
-const langBtn = document.getElementById('login-lang-btn');
-if (langBtn) langBtn.addEventListener('click', toggleLang); // toggleLang persists + reloads
+wireLangMenu(document); // wires [data-lang-toggle] + [data-lang-menu] options
 syncLoginLang();
 
 function showError(msg) {

@@ -13,7 +13,7 @@ const ACC_TYPE = {
   revenue: bi('Revenue', 'إيرادات'), expense: bi('Expense', 'مصروفات'),
 };
 const accTypeLabel = (v) => ACC_TYPE[String(v).toLowerCase()] || v;
-const CURRENCY = bi('SAR', 'ر.س');
+const CURRENCY = currencyCode();
 
 if (content) {
   let all = [];

@@ -7,10 +7,13 @@ const { pool } = require('../config/db');
 const { pick } = require('../utils/i18n');
 
 const generateNextNumber = async (conn, year) => {
+  // Use the highest existing sequence for the year (+1), not COUNT — COUNT
+  // collides when earlier invoices were deleted and left gaps in the sequence.
   const [rows] = await conn.query(
-    'SELECT COUNT(*) AS c FROM invoices WHERE YEAR(invoice_date) = ?', [year]
+    `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(invoice_number, '-', -1) AS UNSIGNED)), 0) AS max_seq
+     FROM invoices WHERE invoice_number LIKE ?`, [`INV-${year}-%`]
   );
-  return `INV-${year}-${String(rows[0].c + 1).padStart(4, '0')}`;
+  return `INV-${year}-${String(rows[0].max_seq + 1).padStart(4, '0')}`;
 };
 
 const getCustomer = async (conn, id) => {
@@ -48,6 +51,37 @@ const insertItem = async (conn, item) => {
   return result.insertId;
 };
 
+/** Lock + read an invoice header (with its customer's AR account) inside a txn. */
+const getInvoiceForUpdate = async (conn, id) => {
+  const [rows] = await conn.query(
+    `SELECT i.id, i.invoice_number, i.customer_id, i.invoice_date, i.subtotal, i.tax_rate,
+            i.tax_amount, i.total_amount, i.amount_paid, i.status,
+            c.name AS customer_name, c.account_id
+     FROM invoices i JOIN customers c ON c.id = i.customer_id
+     WHERE i.id = ? FOR UPDATE`, [id]
+  );
+  return rows[0] || null;
+};
+
+const setStatus = async (conn, id, status) => {
+  await conn.query('UPDATE invoices SET status = ? WHERE id = ?', [status, id]);
+};
+
+/** Hard-delete an invoice (its items cascade). Caller must guard status = 'draft'. */
+const deleteById = async (conn, id) => {
+  const [result] = await conn.query('DELETE FROM invoices WHERE id = ?', [id]);
+  return result.affectedRows > 0;
+};
+
+/** Product lines of an invoice, read INSIDE a txn, for stock/COGS posting. */
+const getItemsForPosting = async (conn, invoiceId) => {
+  const [rows] = await conn.query(
+    'SELECT product_id, quantity FROM invoice_items WHERE invoice_id = ? AND product_id IS NOT NULL',
+    [invoiceId]
+  );
+  return rows;
+};
+
 const getInvoiceFull = async (id, lang) => {
   const [headers] = await pool.query(
     `SELECT i.id, i.invoice_number, i.customer_id, c.name AS customer_name,
@@ -77,5 +111,6 @@ const list = async ({ limit = 20, offset = 0 }) => {
 };
 
 module.exports = {
-  generateNextNumber, getCustomer, getProduct, createHeader, insertItem, getInvoiceFull, list,
+  generateNextNumber, getCustomer, getProduct, createHeader, insertItem,
+  getInvoiceForUpdate, setStatus, deleteById, getItemsForPosting, getInvoiceFull, list,
 };

@@ -3,7 +3,9 @@
 //  Responsibilities: enforce duplicate rules, auto-generate codes, map camelCase
 //  input -> snake_case columns, and write audit-log entries (req. 25).
 // -----------------------------------------------------------------------------
+const { pool } = require('../config/db');
 const model = require('../models/customerModel');
+const ledger = require('./ledgerAccountFactory');
 const audit = require('./auditService');
 const ApiError = require('../utils/ApiError');
 
@@ -40,14 +42,33 @@ const create = async (data, actor) => {
     while (await model.codeExists(customerCode));
   }
 
-  const id = await model.create({ ...data, customerCode });
-  const created = await model.findById(id);
+  // Create the customer AND its dedicated AR sub-account in ONE transaction, so a
+  // customer is never left without a receivable account (which would block its
+  // invoices/payments). If the caller already supplied an accountId, honor it.
+  const conn = await pool.getConnection();
+  let newId;
+  try {
+    await conn.beginTransaction();
+    newId = await model.create({ ...data, customerCode }, conn);
+    if (!data.accountId) {
+      const accountId = await ledger.ensureReceivable(conn, data.name);
+      await model.update(newId, { account_id: accountId }, conn);
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  const created = await model.findById(newId);
 
   await audit.log({
     userId: actor?.id,
     action: 'customer.create',
     entity: 'customers',
-    entityId: id,
+    entityId: newId,
     description: `Created customer ${created.name} (${customerCode})`,
     ip: actor?.ip,
   });

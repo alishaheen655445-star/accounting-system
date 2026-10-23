@@ -56,14 +56,48 @@ if (content) {
     tableEl.innerHTML = `<p class="muted">${escapeHtml(bi('Loading…', 'جارٍ التحميل…'))}</p>`;
     try {
       const res = await api.get(`/invoices?${new URLSearchParams({ page, pageSize })}`);
-      renderTable(tableEl, {
-        columns,
-        rows: res.data,
-        actions: [{ label: bi('View', 'عرض'), className: 'btn-secondary', onClick: openView }],
-      });
+      const actions = [{ label: bi('View', 'عرض'), className: 'btn-secondary', onClick: openView }];
+      if (canWrite) {
+        // Draft-only actions: issue (posts to ledger) and delete (hard remove).
+        actions.push({ label: bi('Issue', 'إصدار'), className: 'btn-secondary', show: (r) => r.status === 'draft', onClick: issueInvoice });
+        actions.push({ label: bi('Delete', 'حذف'), className: 'btn-danger', show: (r) => r.status === 'draft', onClick: deleteInvoice });
+      }
+      renderTable(tableEl, { columns, rows: res.data, actions });
       renderPagination(pagerEl, res.meta, (p) => { page = p; load(); });
     } catch (err) {
       tableEl.innerHTML = `<div class="alert alert-error">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  // ---- Issue a draft (post to ledger) ----
+  async function issueInvoice(row) {
+    const ok = window.confirm(bi(
+      `Issue invoice ${row.invoice_number}? This posts it to the ledger (Dr AR / Cr Revenue), and it can no longer be deleted.`,
+      `إصدار الفاتورة ${row.invoice_number}؟ سيُسجَّل القيد (مدين الذمم / دائر الإيرادات) ولن يمكن حذفها بعد ذلك.`,
+    ));
+    if (!ok) return;
+    try {
+      await api.post(`/invoices/${row.id}/issue`);
+      await load();
+      flashOnce(bi('Invoice issued and posted to the ledger.', 'تم إصدار الفاتورة وتسجيلها في دفتر الأستاذ.'));
+    } catch (err) {
+      alert(err.message);
+    }
+  }
+
+  // ---- Delete a draft (hard remove) ----
+  async function deleteInvoice(row) {
+    const ok = window.confirm(bi(
+      `Delete draft invoice ${row.invoice_number}? This cannot be undone.`,
+      `حذف مسودة الفاتورة ${row.invoice_number}؟ لا يمكن التراجع عن هذا الإجراء.`,
+    ));
+    if (!ok) return;
+    try {
+      await api.del(`/invoices/${row.id}`);
+      await load();
+      flashOnce(bi('Draft invoice deleted.', 'تم حذف المسودة.'));
+    } catch (err) {
+      alert(err.message);
     }
   }
 

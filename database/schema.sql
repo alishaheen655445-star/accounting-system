@@ -128,6 +128,7 @@ CREATE TABLE products (
     unit                   VARCHAR(20)  NOT NULL DEFAULT 'pcs',
     selling_price          DECIMAL(15,2) NOT NULL DEFAULT 0.00,
     cost_price             DECIMAL(15,2) NOT NULL DEFAULT 0.00,
+    stock_quantity         DECIMAL(12,2) NOT NULL DEFAULT 0.00,   -- on-hand qty; + on purchase, - on sale
     revenue_account_id     INT UNSIGNED NULL,              -- FK -> chart_of_accounts (sales revenue)
     inventory_account_id   INT UNSIGNED NULL,              -- FK -> chart_of_accounts (stock asset)
     is_active              TINYINT(1)   NOT NULL DEFAULT 1,
@@ -202,6 +203,57 @@ CREATE TABLE invoice_items (
 ) ENGINE=InnoDB;
 
 -- =============================================================================
+-- 7b. purchases  — supplier purchase / stock-in header (parent)
+--     Mirrors invoices. Creating a purchase posts Dr Inventory / Cr Supplier AP
+--     and increases each product's stock_quantity, all in one transaction.
+-- =============================================================================
+CREATE TABLE purchases (
+    id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    purchase_number VARCHAR(30)  NOT NULL,
+    supplier_id     INT UNSIGNED NOT NULL,                 -- FK -> suppliers
+    purchase_date   DATE         NOT NULL,
+    subtotal        DECIMAL(15,2) NOT NULL DEFAULT 0.00,   -- SUM(line_total) = SUM(qty * unit_cost)
+    total_amount    DECIMAL(15,2) NOT NULL DEFAULT 0.00,   -- = subtotal (no tax on purchases here)
+    status          ENUM('issued','void') NOT NULL DEFAULT 'issued',
+    notes           VARCHAR(255) NULL,
+    created_by      INT UNSIGNED NULL,                     -- FK -> users
+    created_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_purchase_number (purchase_number),
+    KEY idx_purchases_supplier (supplier_id),
+    CONSTRAINT fk_purchases_supplier
+        FOREIGN KEY (supplier_id) REFERENCES suppliers (id)
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_purchases_created_by
+        FOREIGN KEY (created_by) REFERENCES users (id)
+        ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =============================================================================
+-- 7c. purchase_items  — purchase lines (child of purchases)
+-- =============================================================================
+CREATE TABLE purchase_items (
+    id            INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    purchase_id   INT UNSIGNED  NOT NULL,                  -- FK -> purchases (CASCADE)
+    product_id    INT UNSIGNED  NOT NULL,                  -- FK -> products (a purchase always stocks a product)
+    description   VARCHAR(255)  NOT NULL,
+    quantity      DECIMAL(12,2) NOT NULL DEFAULT 1.00,
+    unit_cost     DECIMAL(15,2) NOT NULL DEFAULT 0.00,     -- cost paid per unit
+    line_total    DECIMAL(15,2) NOT NULL DEFAULT 0.00,     -- quantity * unit_cost (backend computes)
+    sort_order    INT UNSIGNED  NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    KEY idx_pitems_purchase (purchase_id),
+    KEY idx_pitems_product (product_id),
+    CONSTRAINT fk_pitems_purchase
+        FOREIGN KEY (purchase_id) REFERENCES purchases (id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_pitems_product
+        FOREIGN KEY (product_id) REFERENCES products (id)
+        ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+-- =============================================================================
 -- 8. journal_entries  — double-entry header (one accounting event)
 --    The balance rule (SUM(debit) == SUM(credit)) is enforced in the backend
 --    inside a DB transaction, because it spans multiple journal_lines rows.
@@ -212,7 +264,7 @@ CREATE TABLE journal_entries (
     entry_date      DATE         NOT NULL,
     description     VARCHAR(255) NOT NULL,                -- Arabic (primary) narration
     description_en  VARCHAR(255) NULL,                    -- English narration (system-generated entries)
-    reference_type  ENUM('manual','invoice','payment','opening') NOT NULL DEFAULT 'manual',
+    reference_type  ENUM('manual','invoice','payment','purchase','opening') NOT NULL DEFAULT 'manual',
     reference_id    INT UNSIGNED NULL,                     -- id in the originating table (non-FK, polymorphic)
     created_by      INT UNSIGNED NULL,                     -- FK -> users
     is_posted       TINYINT(1)   NOT NULL DEFAULT 1,       -- draft vs posted to ledger

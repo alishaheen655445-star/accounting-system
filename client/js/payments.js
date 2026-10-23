@@ -93,11 +93,10 @@ if (content) {
           <input type="date" id="pay-date" value="${today}" /></div>
         <div class="form-group"><label>${escapeHtml(bi('Method', 'طريقة الدفع'))}</label>
           <select id="pay-method">
-            <option value="cash">${escapeHtml(bi('Cash', 'نقدًا'))}</option><option value="bank">${escapeHtml(bi('Bank', 'بنك'))}</option>
-            <option value="cheque">${escapeHtml(bi('Cheque', 'شيك'))}</option><option value="card">${escapeHtml(bi('Card', 'بطاقة'))}</option>
+            <option value="cash">${escapeHtml(bi('Cash', 'نقدًا'))}</option><option value="card">${escapeHtml(bi('Card', 'بطاقة'))}</option>
           </select></div>
         <div class="form-group"><label>${escapeHtml(bi('Reference', 'المرجع'))}</label>
-          <input type="text" id="pay-reference" placeholder="${escapeHtml(bi('Receipt / cheque no. (optional)', 'رقم الوصل / الشيك (اختياري)'))}" /></div>
+          <input type="text" id="pay-reference" placeholder="${escapeHtml(bi('Receipt no. (optional)', 'رقم الوصل (اختياري)'))}" /></div>
       </div>
       <p class="muted" id="pay-hint">${escapeHtml(defaultHint)}</p>`,
       submitPayment

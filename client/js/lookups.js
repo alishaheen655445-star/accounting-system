@@ -30,6 +30,14 @@ async function loadProducts() {
   return _lookupCache.products;
 }
 
+/** Active suppliers as { id, name } for purchase pickers. */
+async function loadSuppliers() {
+  if (_lookupCache.suppliers) return _lookupCache.suppliers;
+  const res = await api.get('/suppliers?pageSize=100');
+  _lookupCache.suppliers = (res.data || []).filter((s) => s.is_active);
+  return _lookupCache.suppliers;
+}
+
 /** Invoices that can still receive a payment (issued / partial). */
 async function loadPayableInvoices() {
   if (_lookupCache.payInvoices) return _lookupCache.payInvoices;

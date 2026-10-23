@@ -16,11 +16,75 @@
 // -----------------------------------------------------------------------------
 const { pool } = require('../config/db');
 const model = require('../models/invoiceModel');
+const productModel = require('../models/productModel');
 const journalService = require('./journalService');
 const audit = require('./auditService');
 const money = require('../utils/money');
 const accounts = require('../config/accounting');
 const ApiError = require('../utils/ApiError');
+
+// Stock + Cost-of-Goods posting (Level B inventory). Runs INSIDE the caller's
+// transaction. Reads the invoice's product lines, blocks any sale whose total
+// demand exceeds on-hand stock (per product), decrements stock, and posts the
+// Dr COGS / Cr Inventory entry. No-op when the invoice has no product lines.
+const applyCostOfGoodsAndStock = async (conn, invoiceId, invoiceDate, actor) => {
+  const items = await model.getItemsForPosting(conn, invoiceId);
+  if (items.length === 0) return;
+
+  // Aggregate demand per product (a product may appear on several lines).
+  const demand = {};
+  for (const it of items) {
+    const pid = Number(it.product_id);
+    demand[pid] = (demand[pid] || 0) + Number(it.quantity);
+  }
+
+  const cogsByInventory = {}; // inventory account id -> cents
+  let totalCogsCents = 0;
+  for (const pidStr of Object.keys(demand)) {
+    const pid = Number(pidStr);
+    const qty = demand[pid];
+    const product = await productModel.getForUpdate(conn, pid); // row lock
+    if (!product) throw new ApiError(400, `Item: product #${pid} not found or inactive`);
+
+    // Only inventory-tracked GOODS consume stock / post COGS. A product with no
+    // inventory account (e.g. a service) is sold with no stock movement at all.
+    if (!product.inventory_account_id) continue;
+
+    const available = Number(product.stock_quantity);
+    if (available < qty) {
+      throw new ApiError(400, `Insufficient stock for '${product.name}': available ${available}, requested ${qty}`);
+    }
+
+    const costCents = money.toCents(product.cost_price);
+    const lineCogs = Math.round(qty * costCents);
+    const invAcct = product.inventory_account_id;
+    cogsByInventory[invAcct] = (cogsByInventory[invAcct] || 0) + lineCogs;
+    totalCogsCents += lineCogs;
+
+    await productModel.adjustStock(conn, pid, -qty); // consume stock
+  }
+
+  if (totalCogsCents > 0) {
+    const lines = [
+      { accountId: accounts.COGS_ACCOUNT_ID, debit: money.fromCents(totalCogsCents), credit: '0.00', memo: 'تكلفة البضاعة المباعة', memoEn: 'Cost of goods sold' },
+    ];
+    for (const [acctId, cents] of Object.entries(cogsByInventory)) {
+      lines.push({ accountId: Number(acctId), debit: '0.00', credit: money.fromCents(cents), memo: 'المخزون', memoEn: 'Inventory' });
+    }
+    await journalService.createEntry(
+      {
+        entryDate: invoiceDate,
+        description: `تكلفة البضاعة المباعة - فاتورة #${invoiceId}`,
+        descriptionEn: `Cost of goods sold - invoice #${invoiceId}`,
+        referenceType: 'invoice',
+        referenceId: invoiceId,
+        lines,
+      },
+      actor,
+      conn
+    );
+  }
+};
 
 const create = async (payload, actor, lang = null) => {
   const { customerId, invoiceDate, dueDate, taxRate = 0, notes } = payload;
@@ -130,6 +194,9 @@ const create = async (payload, actor, lang = null) => {
         actor,
         conn // share the transaction
       );
+
+      // Consume stock and post Dr COGS / Cr Inventory for the product lines.
+      await applyCostOfGoodsAndStock(conn, invoiceId, invoiceDate, actor);
     }
 
     await conn.commit();
@@ -164,4 +231,98 @@ const getById = async (id, lang = null) => {
   return invoice;
 };
 
-module.exports = { create, list, getById };
+// Issue a DRAFT invoice: post the Dr AR / Cr Revenue (+ Cr Tax) entry and flip
+// status to 'issued' in ONE transaction — the same posting a create-as-issued does.
+const issue = async (id, actor, lang = null) => {
+  const invoiceId = Number(id);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const inv = await model.getInvoiceForUpdate(conn, invoiceId); // row lock
+    if (!inv) throw new ApiError(404, 'Invoice not found');
+    if (inv.status !== 'draft') throw new ApiError(400, 'Only draft invoices can be issued');
+    if (!inv.account_id) throw new ApiError(400, 'Customer has no receivable account configured');
+
+    const subtotalCents = money.toCents(inv.subtotal);
+    const taxCents = money.toCents(inv.tax_amount);
+    const totalCents = money.toCents(inv.total_amount);
+
+    const lines = [
+      { accountId: inv.account_id, debit: money.fromCents(totalCents), credit: '0.00', memo: `فاتورة ${inv.invoice_number}`, memoEn: `Invoice ${inv.invoice_number}` },
+      { accountId: accounts.SALES_REVENUE_ACCOUNT_ID, debit: '0.00', credit: money.fromCents(subtotalCents), memo: `مبيعات ${inv.invoice_number}`, memoEn: `Sales ${inv.invoice_number}` },
+    ];
+    if (taxCents > 0) {
+      lines.push({ accountId: accounts.SALES_TAX_PAYABLE_ACCOUNT_ID, debit: '0.00', credit: money.fromCents(taxCents), memo: `ضريبة ${inv.invoice_number}`, memoEn: `Tax ${inv.invoice_number}` });
+    }
+
+    await journalService.createEntry(
+      {
+        entryDate: inv.invoice_date,
+        description: `بيع آجل - ${inv.invoice_number}`,
+        descriptionEn: `Credit sale - ${inv.invoice_number}`,
+        referenceType: 'invoice',
+        referenceId: invoiceId,
+        lines,
+      },
+      actor,
+      conn // share the transaction
+    );
+
+    // Consume stock and post Dr COGS / Cr Inventory for the product lines.
+    await applyCostOfGoodsAndStock(conn, invoiceId, inv.invoice_date, actor);
+
+    await model.setStatus(conn, invoiceId, 'issued');
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  await audit.log({
+    userId: actor?.id,
+    action: 'invoice.issue',
+    entity: 'invoices',
+    entityId: invoiceId,
+    description: `Issued invoice #${invoiceId} (posted to ledger)`,
+    ip: actor?.ip,
+  });
+  return await model.getInvoiceFull(invoiceId, lang);
+};
+
+// Delete a DRAFT invoice (hard delete; items cascade). Issued/partial/paid are
+// protected because they have ledger impact and must be voided instead.
+const remove = async (id, actor) => {
+  const invoiceId = Number(id);
+  const conn = await pool.getConnection();
+  let invoiceNumber;
+  try {
+    await conn.beginTransaction();
+    const inv = await model.getInvoiceForUpdate(conn, invoiceId);
+    if (!inv) throw new ApiError(404, 'Invoice not found');
+    if (inv.status !== 'draft') {
+      throw new ApiError(400, 'Only draft invoices can be deleted. Issued invoices must be voided instead.');
+    }
+    invoiceNumber = inv.invoice_number;
+    await model.deleteById(conn, invoiceId);
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  await audit.log({
+    userId: actor?.id,
+    action: 'invoice.delete',
+    entity: 'invoices',
+    entityId: invoiceId,
+    description: `Deleted draft invoice ${invoiceNumber}`,
+    ip: actor?.ip,
+  });
+};
+
+module.exports = { create, list, getById, issue, remove };

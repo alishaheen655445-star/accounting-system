@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script>(function(){try{if(localStorage.getItem('app_theme')==='dark')document.documentElement.classList.add('dark');var a=localStorage.getItem('app_lang')==='ar'?'ar':'en';document.documentElement.lang=a;document.documentElement.dir=(a==='ar'?'rtl':'ltr');}catch(e){}})();</script>
-  <title data-en="Login · Accounting System" data-ar="تسجيل الدخول · نظام المحاسبة">Login · Accounting System</title>
+  <script>(function(){try{if(localStorage.getItem('app_theme')==='dark')document.documentElement.classList.add('dark');var a=localStorage.getItem('app_lang');a=(a==='ar'||a==='fa')?a:'en';document.documentElement.lang=a;document.documentElement.dir=(a==='ar'||a==='fa')?'rtl':'ltr';}catch(e){}})();</script>
+  <title data-en="Login · Accounting System" data-ar="تسجيل الدخول · نظام المحاسبة" data-fa="ورود · سیستم حسابداری">Login · Accounting System</title>
   <!-- Stitch design tokens (Tailwind theme). The Play CDN defines the `tailwind`
        global, so it MUST load BEFORE tailwind-config.js sets `tailwind.config`. -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -16,10 +16,18 @@
 <body class="ds bg-surface font-body text-on-surface">
   <!-- Language + theme toggles (fixed at the start-top corner) — wired in login.js -->
   <div class="fixed top-4 flex items-center gap-2" style="inset-inline-start:1rem">
-    <button id="login-lang-btn" title="Switch language · بدّل اللغة"
-      class="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-label-md">
-      <span class="material-symbols-outlined text-[20px]">translate</span><span id="login-lang-label"></span>
-    </button>
+    <div class="relative">
+      <button data-lang-toggle title="Switch language · بدّل اللغة · تغییر زبان"
+        class="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-surface-container-high text-on-surface hover:bg-surface-container-highest font-label-md">
+        <span class="material-symbols-outlined text-[20px]">translate</span><span id="login-lang-label"></span>
+        <span class="material-symbols-outlined text-[18px]">expand_more</span>
+      </button>
+      <div data-lang-menu class="hidden absolute mt-2 min-w-[10rem] rounded-xl bg-surface-container-lowest shadow-lg border border-outline-variant py-1 z-50" style="inset-inline-start:0">
+        <button class="w-full text-start px-4 py-2 hover:bg-surface-container-high font-label-md" data-lang-opt="en">English</button>
+        <button class="w-full text-start px-4 py-2 hover:bg-surface-container-high font-label-md" data-lang-opt="ar">العربية</button>
+        <button class="w-full text-start px-4 py-2 hover:bg-surface-container-high font-label-md" data-lang-opt="fa">فارسی</button>
+      </div>
+    </div>
     <button id="login-theme-btn" title="Theme · المظهر"
       class="flex items-center justify-center w-10 h-10 rounded-xl bg-surface-container-high text-on-surface hover:bg-surface-container-highest">
       <span class="material-symbols-outlined text-[20px]">dark_mode</span>
@@ -31,33 +39,33 @@
       <!-- Brand -->
       <div class="flex items-center justify-center gap-3 mb-6">
         <span class="material-symbols-outlined text-primary text-[32px]">account_balance</span>
-        <h1 class="font-headline-lg text-headline-lg text-primary" style="margin:0" data-en="Double-Entry Accounting" data-ar="المحاسبة المزدوجة">Double-Entry Accounting</h1>
+        <h1 class="font-headline-lg text-headline-lg text-primary" style="margin:0" data-en="Double-Entry Accounting" data-ar="المحاسبة المزدوجة" data-fa="حسابداری دوتایی">Double-Entry Accounting</h1>
       </div>
 
       <!-- Login card -->
       <div class="bg-surface-container-lowest p-8 rounded-2xl shadow-sm">
-        <p class="text-on-surface-variant font-body-md" style="margin:0 0 1.5rem" data-en="Sign in to continue" data-ar="سجّل الدخول للمتابعة">Sign in to continue</p>
+        <p class="text-on-surface-variant font-body-md" style="margin:0 0 1.5rem" data-en="Sign in to continue" data-ar="سجّل الدخول للمتابعة" data-fa="برای ادامه وارد شوید">Sign in to continue</p>
 
         <!-- Alert box (errors show here) -->
         <div id="alert" class="alert alert-error hidden" style="margin:0 0 1rem"></div>
 
         <form id="login-form" autocomplete="off" novalidate class="space-y-4">
           <div class="form-group">
-            <label for="identifier" data-en="Username" data-ar="اسم المستخدم">Username</label>
-            <input id="identifier" name="identifier" type="text" data-en-ph="e.g. admin" data-ar-ph="مثال: admin" placeholder="e.g. admin" required />
+            <label for="identifier" data-en="Username" data-ar="اسم المستخدم" data-fa="نام کاربری">Username</label>
+            <input id="identifier" name="identifier" type="text" data-en-ph="e.g. admin" data-ar-ph="مثال: admin" data-fa-ph="مثلاً admin" placeholder="e.g. admin" required />
           </div>
           <div class="form-group">
-            <label for="password" data-en="Password" data-ar="كلمة المرور">Password</label>
+            <label for="password" data-en="Password" data-ar="كلمة المرور" data-fa="رمز عبور">Password</label>
             <input id="password" name="password" type="password" placeholder="••••••••" required />
           </div>
-          <button id="login-btn" class="btn" type="submit" style="width:100%" data-en="Sign in" data-ar="دخول">Sign in</button>
+          <button id="login-btn" class="btn" type="submit" style="width:100%" data-en="Sign in" data-ar="دخول" data-fa="ورود">Sign in</button>
         </form>
 
         <div class="demo-box" style="margin-top:1.5rem">
-          <strong data-en="Demo accounts" data-ar="حسابات تجريبية">Demo accounts</strong><br />
-          <span data-en="Admin" data-ar="مدير">Admin</span> <code>admin / Admin@123</code><br />
-          <span data-en="Accountant" data-ar="محاسب">Accountant</span> <code>accountant / Accountant@123</code><br />
-          <span data-en="Viewer (read-only)" data-ar="مشاهد (للقراءة فقط)">Viewer (read-only)</span> <code>viewer / Viewer@123</code>
+          <strong data-en="Demo accounts" data-ar="حسابات تجريبية" data-fa="حساب‌های نمایشی">Demo accounts</strong><br />
+          <span data-en="Admin" data-ar="مدير" data-fa="مدیر">Admin</span> <code>admin / Admin@123</code><br />
+          <span data-en="Accountant" data-ar="محاسب" data-fa="حسابدار">Accountant</span> <code>accountant / Accountant@123</code><br />
+          <span data-en="Viewer (read-only)" data-ar="مشاهد (للقراءة فقط)" data-fa="بیننده (فقط‌خواندنی)">Viewer (read-only)</span> <code>viewer / Viewer@123</code>
         </div>
       </div>
     </div>

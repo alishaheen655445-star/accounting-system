@@ -24,4 +24,14 @@ const getById = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Invoice retrieved', data: { invoice } });
 });
 
-module.exports = { create, list, getById };
+const issue = asyncHandler(async (req, res) => {
+  const invoice = await service.issue(req.params.id, actorOf(req), langOf(req));
+  return sendSuccess(res, { message: 'Invoice issued', data: { invoice } });
+});
+
+const remove = asyncHandler(async (req, res) => {
+  await service.remove(req.params.id, actorOf(req));
+  return sendSuccess(res, { message: 'Draft invoice deleted' });
+});
+
+module.exports = { create, list, getById, issue, remove };

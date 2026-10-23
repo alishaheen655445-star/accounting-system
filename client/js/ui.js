@@ -21,28 +21,47 @@
 //  Switching language reloads the page so every (re)rendered label and the
 //  document direction update together; the bootstrap keeps the switch seamless.
 // -----------------------------------------------------------------------------
+// Supported languages: 'en' LTR, 'ar' RTL, 'fa' (Persian/Farsi) RTL.
+const LANGS = [
+  { code: 'en', native: 'English' },
+  { code: 'ar', native: 'العربية' },
+  { code: 'fa', native: 'فارسی' },
+];
+const isRtl = (code) => code === 'ar' || code === 'fa';
+const langNative = (code) => (LANGS.find((l) => l.code === (code || getLang())) || LANGS[0]).native;
+
 function getLang() {
-  return localStorage.getItem('app_lang') === 'ar' ? 'ar' : 'en';
+  const l = localStorage.getItem('app_lang');
+  return (l === 'ar' || l === 'fa') ? l : 'en';
 }
 function applyLang(lang) {
-  const l = lang === 'ar' ? 'ar' : 'en';
+  const l = (lang === 'ar' || lang === 'fa') ? lang : 'en';
   document.documentElement.lang = l;
-  document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+  document.documentElement.dir = isRtl(l) ? 'rtl' : 'ltr';
 }
 function setLang(lang) {
-  const l = lang === 'ar' ? 'ar' : 'en';
+  const l = (lang === 'ar' || lang === 'fa') ? lang : 'en';
   localStorage.setItem('app_lang', l);
   applyLang(l);
 }
-// Toggle the language and reload so all labels + direction refresh together.
-function toggleLang() {
-  setLang(getLang() === 'ar' ? 'en' : 'ar');
+// Switch to a specific language and reload so all labels + direction refresh together.
+function switchLang(lang) {
+  setLang(lang);
   location.reload();
 }
+// Legacy 2-way toggle kept for safety; cycles en -> ar -> fa -> en.
+function toggleLang() {
+  const order = ['en', 'ar', 'fa'];
+  switchLang(order[(order.indexOf(getLang()) + 1) % order.length]);
+}
 
-// Return the string for the ACTIVE language from an English/Arabic pair.
-function bi(en, ar) {
-  return getLang() === 'ar' ? (ar || en) : en;
+// Return the string for the ACTIVE language from an English/Arabic/Persian set.
+// Persian falls back to English when a translation is not authored (basic mode).
+function bi(en, ar, fa) {
+  const l = getLang();
+  if (l === 'ar') return ar || en;
+  if (l === 'fa') return fa || en;
+  return en;
 }
 
 // Translate static markup (used by the login page): any element with
@@ -50,21 +69,45 @@ function bi(en, ar) {
 // with data-en-ph / data-ar-ph get their placeholder translated.
 function applyStaticI18n(root) {
   const scope = root || document;
+  const l = getLang();
   scope.querySelectorAll('[data-en]').forEach((el) => {
-    el.textContent = getLang() === 'ar' ? (el.dataset.ar || el.dataset.en) : el.dataset.en;
+    if (l === 'ar') el.textContent = el.dataset.ar || el.dataset.en;
+    else if (l === 'fa') el.textContent = el.dataset.fa || el.dataset.en;
+    else el.textContent = el.dataset.en;
   });
   scope.querySelectorAll('[data-en-ph]').forEach((el) => {
-    el.placeholder = getLang() === 'ar' ? (el.dataset.arPh || el.dataset.enPh) : el.dataset.enPh;
+    if (l === 'ar') el.placeholder = el.dataset.arPh || el.dataset.enPh;
+    else if (l === 'fa') el.placeholder = el.dataset.faPh || el.dataset.enPh;
+    else el.placeholder = el.dataset.enPh;
   });
+}
+
+// Wire a language dropdown menu: a [data-lang-toggle] button reveals a
+// [data-lang-menu] panel whose [data-lang-opt] items switch the app language.
+function wireLangMenu(root) {
+  const scope = root || document;
+  const btn = scope.querySelector('[data-lang-toggle]');
+  const menu = scope.querySelector('[data-lang-menu]');
+  if (!btn || !menu) return;
+  btn.addEventListener('click', (e) => { e.stopPropagation(); menu.classList.toggle('hidden'); });
+  menu.querySelectorAll('[data-lang-opt]').forEach((o) =>
+    o.addEventListener('click', () => switchLang(o.dataset.langOpt)));
+  document.addEventListener('click', () => menu.classList.add('hidden'));
 }
 
 // Format a numeric value (the API returns money as exact decimal STRINGS) for
 // display with thousands separators and 2 decimals. Display-only: we never do
 // financial math here — the backend is the single source of truth.
+// The whole app is priced in US Dollars (one unified currency — no FX conversion).
+const CURRENCY_SYMBOL = '$';
+// Short currency label for table headers, localized (Persian falls back to USD).
+const currencyCode = () => bi('USD', 'دولار', 'دلار');
+
 function formatMoney(value) {
   const n = Number(value);
   if (Number.isNaN(n)) return String(value ?? '');
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const abs = Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return n < 0 ? `-${CURRENCY_SYMBOL}${abs}` : `${CURRENCY_SYMBOL}${abs}`;
 }
 
 // Escape untrusted text before injecting into innerHTML (prevents XSS).
@@ -104,6 +147,13 @@ const UI_STRINGS = {
     pageOf: (p, t, n) => `صفحة ${p} من ${t} · ${n} سجل`,
     deactivateConfirm: (name) => `إيقاف "${name}"؟\nهذا حذف ناعم — يبقى السجل محفوظًا للتاريخ.`,
   },
+  fa: {
+    actions: 'عملیات', noRecords: 'رکوردی یافت نشد.', cancel: 'لغو',
+    save: 'ذخیره', prev: '› قبلی', next: 'بعدی ‹',
+    select: '— انتخاب —', saveFailed: 'ذخیره ناموفق بود.',
+    pageOf: (p, t, n) => `صفحه ${p} از ${t} · ${n} رکورد`,
+    deactivateConfirm: (name) => `"${name}" غیرفعال شود؟\nاین حذف نرم است — رکورد برای تاریخچه نگه داشته می‌شود.`,
+  },
 };
 
 function t(key, ...args) {
@@ -114,7 +164,8 @@ function t(key, ...args) {
   };
   const en = resolve(UI_STRINGS.en);
   const ar = resolve(UI_STRINGS.ar);
-  return bi(en, ar);
+  const fa = resolve(UI_STRINGS.fa);
+  return bi(en, ar, fa);
 }
 
 // ---- Theme (light / dark) — persisted, applied via a `dark` class on <html> ----

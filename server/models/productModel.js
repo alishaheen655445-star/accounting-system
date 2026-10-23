@@ -6,7 +6,7 @@
 const { pool } = require('../config/db');
 
 const SAFE_COLUMNS = `
-  id, sku, name, description, unit, selling_price, cost_price,
+  id, sku, name, description, unit, selling_price, cost_price, stock_quantity,
   revenue_account_id, inventory_account_id, is_active, created_at, updated_at`;
 
 const findAll = async ({ search = '', isActive = null, limit = 10, offset = 0 }) => {
@@ -89,4 +89,26 @@ const generateNextSku = async () => {
   return `P-${String(rows[0].next).padStart(3, '0')}`;
 };
 
-module.exports = { findAll, findById, skuExists, create, update, deactivate, generateNextSku };
+/**
+ * Lock + read a product INSIDE a caller transaction (FOR UPDATE) so stock can
+ * be checked/adjusted atomically. Returns cost + inventory account + on-hand qty.
+ */
+const getForUpdate = async (conn, id) => {
+  const [rows] = await conn.query(
+    `SELECT id, sku, name, cost_price, inventory_account_id, stock_quantity
+     FROM products WHERE id = ? AND is_active = 1 LIMIT 1 FOR UPDATE`, [id]
+  );
+  return rows[0] || null;
+};
+
+/** Atomically add a (signed) delta to a product's on-hand quantity. */
+const adjustStock = async (conn, id, delta) => {
+  await conn.query('UPDATE products SET stock_quantity = stock_quantity + ? WHERE id = ?', [delta, id]);
+};
+
+/** Set the latest purchase cost (last-cost basis) so future COGS matches stock. */
+const setCostPrice = async (conn, id, cost) => {
+  await conn.query('UPDATE products SET cost_price = ? WHERE id = ?', [cost, id]);
+};
+
+module.exports = { findAll, findById, skuExists, create, update, deactivate, generateNextSku, getForUpdate, adjustStock, setCostPrice };

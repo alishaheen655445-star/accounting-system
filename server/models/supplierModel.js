@@ -56,7 +56,7 @@ const codeExists = async (code, excludeId = null) => {
   return rows.length > 0;
 };
 
-const create = async (data) => {
+const create = async (data, executor = pool) => {
   const sql = `
     INSERT INTO suppliers
       (supplier_code, name, email, phone, address, opening_balance, account_id)
@@ -65,17 +65,17 @@ const create = async (data) => {
     data.supplierCode, data.name, data.email || null, data.phone || null,
     data.address || null, data.openingBalance ?? '0.00', data.accountId || null,
   ];
-  const [result] = await pool.query(sql, params);
+  const [result] = await executor.query(sql, params);
   return result.insertId;
 };
 
 /** Partial update — only provided fields change; column names whitelisted by caller. */
-const update = async (id, fields) => {
+const update = async (id, fields, executor = pool) => {
   const keys = Object.keys(fields);
   if (keys.length === 0) return false;
   const setSql = keys.map((k) => `${k} = ?`).join(', ');
   const params = [...Object.values(fields), id];
-  await pool.query(`UPDATE suppliers SET ${setSql} WHERE id = ?`, params);
+  await executor.query(`UPDATE suppliers SET ${setSql} WHERE id = ?`, params);
   return true;
 };
 

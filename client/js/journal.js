@@ -40,8 +40,8 @@ if (content) {
       <span class="inline-flex items-center gap-1 text-on-surface-variant">
         <span class="material-symbols-outlined text-[16px]">${refIcons[v] || 'link'}</span>${escapeHtml(refLabel(v) || '—')}
       </span>` },
-    { key: 'total_debit', label: bi('Debit (SAR)', 'المدين (ر.س)'), numeric: true, render: (v) => `<span class="mono font-semibold">${formatMoney(v)}</span>` },
-    { key: 'total_credit', label: bi('Credit (SAR)', 'الدائن (ر.س)'), numeric: true, render: (v) => `<span class="mono font-semibold">${formatMoney(v)}</span>` },
+    { key: 'total_debit', label: bi('Debit (USD)', 'المدين (دولار)', 'بدهکار (دلار)'), numeric: true, render: (v) => `<span class="mono font-semibold">${formatMoney(v)}</span>` },
+    { key: 'total_credit', label: bi('Credit (USD)', 'الدائن (دولار)', 'بستانکار (دلار)'), numeric: true, render: (v) => `<span class="mono font-semibold">${formatMoney(v)}</span>` },
     { key: 'status', label: bi('Status', 'الحالة'), render: () => postedPill() },
   ];
 
@@ -98,7 +98,7 @@ if (content) {
       </div>
       <div class="bg-surface-container-lowest p-6 rounded-xl shadow-sm flex flex-col justify-between space-y-4">
         <div class="flex items-center justify-between">
-          <span class="text-on-surface-variant font-label-md">${escapeHtml(bi('Total Movements This Page (SAR)', 'إجمالي حركات هذه الصفحة (ر.س)'))}</span>
+          <span class="text-on-surface-variant font-label-md">${escapeHtml(bi('Total Movements This Page (USD)', 'إجمالي حركات هذه الصفحة (دولار)', 'جمع تراکنش‌های این صفحه (دلار)'))}</span>
           <div class="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center text-primary">
             <span class="material-symbols-outlined">account_balance_wallet</span>
           </div>
@@ -231,7 +231,7 @@ if (content) {
       </div>
       <div class="bg-tertiary-fixed-dim/15 border border-on-tertiary-fixed-variant/30 p-4 rounded-xl flex items-center justify-between text-on-surface mt-1">
         <span class="font-label-lg text-on-tertiary-fixed-variant">${escapeHtml(bi('Total Debit / Credit', 'إجمالي المدين / الدائن'))}</span>
-        <span class="mono font-bold text-sm">${formatMoney(tDebit)} / ${formatMoney(tCredit)} ${escapeHtml(bi('SAR', 'ر.س'))}</span>
+        <span class="mono font-bold text-sm">${formatMoney(tDebit)} / ${formatMoney(tCredit)}</span>
       </div>`,
       autoPrint ? () => { window.print(); return true; } : null
     );
@@ -276,8 +276,8 @@ if (content) {
             <thead>
               <tr class="text-on-surface-variant font-label-sm">
                 <th style="min-width:240px">${escapeHtml(bi('Account *', 'الحساب المحاسبي *'))}</th>
-                <th class="num" style="width:130px">${escapeHtml(bi('Debit (SAR)', 'المدين (ر.س)'))}</th>
-                <th class="num" style="width:130px">${escapeHtml(bi('Credit (SAR)', 'الدائن (ر.س)'))}</th>
+                <th class="num" style="width:130px">${escapeHtml(bi('Debit (USD)', 'المدين (دولار)', 'بدهکار (دلار)'))}</th>
+                <th class="num" style="width:130px">${escapeHtml(bi('Credit (USD)', 'الدائن (دولار)', 'بستانکار (دلار)'))}</th>
                 <th style="width:200px">${escapeHtml(bi('Memo', 'ملاحظة'))}</th>
                 <th class="num" style="width:40px"></th>
               </tr>
@@ -345,7 +345,7 @@ if (content) {
         icon.className = 'material-symbols-outlined text-error text-[24px]';
         text.textContent = td === tc
           ? bi('Enter debit and credit amounts to check balance', 'أدخل مبالغ المدين والدائن للتحقق من التوازن')
-          : bi(`Unbalanced entry! Difference ${formatMoney(Math.abs(td - tc) / 100)} SAR`, `القيد غير متوازن! الفرق ${formatMoney(Math.abs(td - tc) / 100)} ر.س`);
+          : bi(`Unbalanced entry! Difference ${formatMoney(Math.abs(td - tc) / 100)}`, `القيد غير متوازن! الفرق ${formatMoney(Math.abs(td - tc) / 100)}`, `قید نامتوازن! اختلاف ${formatMoney(Math.abs(td - tc) / 100)}`);
       }
     }
 

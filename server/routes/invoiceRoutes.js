@@ -17,5 +17,7 @@ const WRITE_ROLES = authorize('admin', 'accountant');
 router.get('/', listRules, validate, controller.list);
 router.get('/:id', idParam, validate, controller.getById);
 router.post('/', WRITE_ROLES, createRules, validate, controller.create);
+router.post('/:id/issue', WRITE_ROLES, idParam, validate, controller.issue);
+router.delete('/:id', WRITE_ROLES, idParam, validate, controller.remove);
 
 module.exports = router;

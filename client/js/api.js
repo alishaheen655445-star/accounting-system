@@ -20,8 +20,10 @@ async function apiRequest(path, { method = 'GET', body, auth = true } = {}) {
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   // Tell the backend which language to return stored DATA in (account names,
   // ledger narrations, notes). Read straight from localStorage so this file
-  // stays independent of ui.js load order.
-  headers['X-App-Lang'] = localStorage.getItem('app_lang') === 'ar' ? 'ar' : 'en';
+  // stays independent of ui.js load order. The backend localizes 'ar'; 'fa'
+  // (and anything else) falls back to English data until a *_fa set exists.
+  const _lang = localStorage.getItem('app_lang');
+  headers['X-App-Lang'] = (_lang === 'ar' || _lang === 'fa') ? _lang : 'en';
   if (auth) {
     const token = localStorage.getItem('acct_token');
     if (token) headers['Authorization'] = `Bearer ${token}`;

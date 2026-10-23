@@ -3,7 +3,9 @@
 //  Mirrors customerService.js: duplicate rules, auto code generation, camelCase
 //  -> snake_case mapping, and audit-log entries (req. 25).
 // -----------------------------------------------------------------------------
+const { pool } = require('../config/db');
 const model = require('../models/supplierModel');
+const ledger = require('./ledgerAccountFactory');
 const audit = require('./auditService');
 const ApiError = require('../utils/ApiError');
 
@@ -34,14 +36,32 @@ const create = async (data, actor) => {
     while (await model.codeExists(supplierCode));
   }
 
-  const id = await model.create({ ...data, supplierCode });
-  const created = await model.findById(id);
+  // Create the supplier AND its dedicated AP sub-account in ONE transaction, so a
+  // supplier is never left without a payable account. Honor a caller-supplied id.
+  const conn = await pool.getConnection();
+  let newId;
+  try {
+    await conn.beginTransaction();
+    newId = await model.create({ ...data, supplierCode }, conn);
+    if (!data.accountId) {
+      const accountId = await ledger.ensurePayable(conn, data.name);
+      await model.update(newId, { account_id: accountId }, conn);
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  const created = await model.findById(newId);
 
   await audit.log({
     userId: actor?.id,
     action: 'supplier.create',
     entity: 'suppliers',
-    entityId: id,
+    entityId: newId,
     description: `Created supplier ${created.name} (${supplierCode})`,
     ip: actor?.ip,
   });
