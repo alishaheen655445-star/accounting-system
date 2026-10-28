@@ -17,11 +17,13 @@ const revenueAccountId = body('revenueAccountId').optional({ values: 'falsy' })
   .isInt({ min: 1 }).withMessage('Revenue account ID must be a positive integer').toInt();
 const inventoryAccountId = body('inventoryAccountId').optional({ values: 'falsy' })
   .isInt({ min: 1 }).withMessage('Inventory account ID must be a positive integer').toInt();
+const type = body('type').optional({ values: 'falsy' }).toLowerCase()
+  .isIn(['goods', 'service']).withMessage('Type must be goods or service');
 
 const createRules = [
   body('sku').optional({ values: 'falsy' }).trim()
     .isLength({ min: 1, max: 30 }).withMessage('Sku is too long'),
-  name, description, unit, sellingPrice, costPrice, revenueAccountId, inventoryAccountId,
+  name, description, unit, sellingPrice, costPrice, revenueAccountId, inventoryAccountId, type,
 ];
 
 const updateRules = [
@@ -31,7 +33,7 @@ const updateRules = [
   body('name').optional({ values: 'falsy' }).trim()
     .notEmpty().withMessage('Name cannot be empty')
     .isLength({ max: 150 }).withMessage('Name is too long'),
-  description, unit, sellingPrice, costPrice, revenueAccountId, inventoryAccountId,
+  description, unit, sellingPrice, costPrice, revenueAccountId, inventoryAccountId, type,
   body('isActive').optional().isBoolean().withMessage('isActive must be boolean').toBoolean(),
 ];
 

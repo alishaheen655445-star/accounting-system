@@ -21,6 +21,13 @@ if (content) {
 
   const fields = [
     { name: 'name', label: bi('Name', 'الاسم'), type: 'text', required: true },
+    {
+      name: 'type', label: bi('Product Type', 'نوع المنتج', 'نوع محصول'), type: 'select', required: true,
+      options: [
+        { value: 'goods', label: bi('Goods (tracked in stock)', 'بضاعة (مُتبَّعة في المخزون)', 'کالا (انباری)') },
+        { value: 'service', label: bi('Service (no stock)', 'خدمة (بدون مخزون)', 'خدمت (غیر انباری)') },
+      ],
+    },
     { name: 'sku', label: bi('SKU', 'رمز المنتج'), type: 'text', placeholder: bi('Leave blank to auto-generate', 'اتركه فارغًا للتوليد التلقائي') },
     { name: 'unit', label: bi('Unit', 'الوحدة'), type: 'text', placeholder: bi('pcs, hour, kg…', 'قطعة، ساعة، كغ…') },
     { name: 'sellingPrice', label: bi('Selling Price', 'سعر البيع'), type: 'number', placeholder: '0.00' },
@@ -29,7 +36,7 @@ if (content) {
   ];
 
   const toForm = (row) => ({
-    name: row.name, sku: row.sku || '', unit: row.unit || '',
+    name: row.name, type: row.inventory_account_id ? 'goods' : 'service', sku: row.sku || '', unit: row.unit || '',
     sellingPrice: row.selling_price, costPrice: row.cost_price, description: row.description || '',
   });
 
@@ -89,6 +96,7 @@ if (content) {
     openFormModal({
       title: bi('Add Product', 'إضافة منتج'),
       fields,
+      initialValues: { type: 'goods' },
       onSubmit: async (values) => { await api.post('/products', values); page = 1; await load(); },
     });
   }

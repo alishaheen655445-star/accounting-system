@@ -214,6 +214,7 @@ CREATE TABLE purchases (
     purchase_date   DATE         NOT NULL,
     subtotal        DECIMAL(15,2) NOT NULL DEFAULT 0.00,   -- SUM(line_total) = SUM(qty * unit_cost)
     total_amount    DECIMAL(15,2) NOT NULL DEFAULT 0.00,   -- = subtotal (no tax on purchases here)
+    amount_paid     DECIMAL(15,2) NOT NULL DEFAULT 0.00,   -- paid at purchase time (cash/bank); remainder stays in AP
     status          ENUM('issued','void') NOT NULL DEFAULT 'issued',
     notes           VARCHAR(255) NULL,
     created_by      INT UNSIGNED NULL,                     -- FK -> users

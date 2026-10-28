@@ -43,12 +43,8 @@
 
 ## ٣) البنية المعمارية (Architecture)
 ```
-┌────────────────   HTTP/JSON    ┌──────────────────────────┐   SQL   ┌─────────┐
-│   Frontend     │ ─────────────► │      Backend (API)       │ ──────► │  MySQL  │
-│  (client/)     │ ◄───────────── │  Express :3000           │ ◄────── │ :3306   │
-│ Vanilla JS+fetch│   JSON موحّد   │  Routes→Controllers→     │         │         │
-└────────────────                │  Services→Models         │         └─────────┘
-                                  └──────────────────────────┘
+[ Frontend  (client/) ]  --HTTP + JSON-->  [ Backend API  (Express :3000) ]  --SQL-->  [ MySQL :3306 ]
+   Vanilla JS + fetch                          Routes > Controllers > Services > Models
 ```
 
 ### ٣.١ طبقات الـ Backend (`server/`)

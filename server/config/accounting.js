@@ -6,6 +6,7 @@
 // -----------------------------------------------------------------------------
 module.exports = {
   SALES_REVENUE_ACCOUNT_ID: Number(process.env.ACCOUNT_SALES_REVENUE || 14), // 4100 Sales Revenue
+  SERVICE_REVENUE_ACCOUNT_ID: Number(process.env.ACCOUNT_SERVICE_REVENUE || 15), // 4200 Service Revenue
   SALES_TAX_PAYABLE_ACCOUNT_ID: Number(process.env.ACCOUNT_TAX_PAYABLE || 11), // 2200 Sales Tax Payable
   CASH_ACCOUNT_ID: Number(process.env.ACCOUNT_CASH || 6), // 1100 Cash on Hand
   BANK_ACCOUNT_ID: Number(process.env.ACCOUNT_BANK || 7), // 1200 Bank Account

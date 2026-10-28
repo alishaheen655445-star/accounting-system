@@ -16,3 +16,9 @@ Thumbs.db
 
 # Build output (if any later)
 dist/
+
+# Temp screenshots from PDF generation (safe to delete)
+docs/_shot_*.png
+
+# Local DB backups (contain data — never commit)
+_db_backup_*.sql

@@ -25,9 +25,9 @@ const getSupplier = async (conn, id) => {
 const createHeader = async (conn, p) => {
   const [result] = await conn.query(
     `INSERT INTO purchases
-       (purchase_number, supplier_id, purchase_date, subtotal, total_amount, status, notes, created_by)
-     VALUES (?, ?, ?, ?, ?, 'issued', ?, ?)`,
-    [p.purchaseNumber, p.supplierId, p.purchaseDate, p.subtotal, p.totalAmount, p.notes || null, p.createdBy || null]
+       (purchase_number, supplier_id, purchase_date, subtotal, total_amount, amount_paid, status, notes, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, 'issued', ?, ?)`,
+    [p.purchaseNumber, p.supplierId, p.purchaseDate, p.subtotal, p.totalAmount, p.amountPaid || '0.00', p.notes || null, p.createdBy || null]
   );
   return result.insertId;
 };
@@ -44,7 +44,7 @@ const insertItem = async (conn, item) => {
 const getPurchaseFull = async (id) => {
   const [headers] = await pool.query(
     `SELECT pu.id, pu.purchase_number, pu.supplier_id, s.name AS supplier_name,
-            pu.purchase_date, pu.subtotal, pu.total_amount, pu.status, pu.notes,
+            pu.purchase_date, pu.subtotal, pu.total_amount, pu.amount_paid, pu.status, pu.notes,
             pu.created_by, pu.created_at, pu.updated_at
      FROM purchases pu JOIN suppliers s ON s.id = pu.supplier_id
      WHERE pu.id = ? LIMIT 1`, [id]
@@ -61,7 +61,7 @@ const getPurchaseFull = async (id) => {
 const list = async ({ limit = 20, offset = 0 }) => {
   const [rows] = await pool.query(
     `SELECT pu.id, pu.purchase_number, pu.supplier_id, s.name AS supplier_name,
-            pu.purchase_date, pu.total_amount, pu.status, pu.created_at
+            pu.purchase_date, pu.total_amount, pu.amount_paid, pu.status, pu.created_at
      FROM purchases pu JOIN suppliers s ON s.id = pu.supplier_id
      ORDER BY pu.id DESC LIMIT ? OFFSET ?`, [limit, offset]
   );

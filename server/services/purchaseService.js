@@ -4,7 +4,12 @@
 //  double-entry ledger movement:
 //
 //    Dr  Inventory account (per product)   subtotal
-//    Cr  Supplier Payable (AP) account      total
+//    Cr  Supplier Payable (AP) account      total  (or, when paid now:)
+//    Cr  Cash / Bank account                amount_paid    (settled immediately)
+//    Cr  Supplier Payable (AP) account      total - amount_paid  (remainder owed)
+//
+//  A purchase may be paid in full or partially at creation time from Cash on
+//  Hand (cash) or Bank (card); the unpaid balance stays in the supplier AP.
 //
 //  Money is computed server-side from integer cents (requirement 24):
 //    line_total = quantity * unit_cost ; subtotal = total = SUM(line_total)
@@ -17,10 +22,12 @@ const productModel = require('../models/productModel');
 const journalService = require('./journalService');
 const audit = require('./auditService');
 const money = require('../utils/money');
+const accounts = require('../config/accounting');
 const ApiError = require('../utils/ApiError');
 
 const create = async (payload, actor) => {
-  const { supplierId, purchaseDate, notes } = payload;
+  const { supplierId, purchaseDate, notes, amountPaid } = payload;
+  const paymentMethod = (payload.paymentMethod || 'cash').toString().toLowerCase();
   const items = payload.items;
   if (!Array.isArray(items) || items.length === 0) {
     throw new ApiError(400, 'A purchase must contain at least one line item');
@@ -85,6 +92,16 @@ const create = async (payload, actor) => {
 
     if (subtotalCents <= 0) throw new ApiError(400, 'Purchase total must be greater than zero');
 
+    // Optional pay-at-purchase settlement: cash/bank now, remainder stays in AP.
+    let paidCents = 0;
+    if (amountPaid !== undefined && amountPaid !== null && amountPaid !== '') {
+      paidCents = money.toCents(amountPaid);
+    }
+    if (paidCents < 0) throw new ApiError(400, 'Payment cannot be negative');
+    if (paidCents > subtotalCents) throw new ApiError(400, 'Payment cannot exceed the purchase total');
+    const dueCents = subtotalCents - paidCents;
+    const cashAcctId = paymentMethod === 'card' ? accounts.BANK_ACCOUNT_ID : accounts.CASH_ACCOUNT_ID;
+
     const year = new Date(purchaseDate).getFullYear();
     const purchaseNumber = await model.generateNextNumber(conn, year);
     const purchaseId = await model.createHeader(conn, {
@@ -93,6 +110,7 @@ const create = async (payload, actor) => {
       purchaseDate,
       subtotal: money.fromCents(subtotalCents),
       totalAmount: money.fromCents(subtotalCents),
+      amountPaid: money.fromCents(paidCents),
       notes: notes || null,
       createdBy: actor?.id,
     });
@@ -115,7 +133,13 @@ const create = async (payload, actor) => {
         lines.push({ accountId: Number(acctId), debit: money.fromCents(cents), credit: '0.00', memo: `مشتريات ${purchaseNumber}`, memoEn: `Purchase ${purchaseNumber}` });
       }
     }
-    lines.push({ accountId: supplier.account_id, debit: '0.00', credit: money.fromCents(subtotalCents), memo: `ذمم مدينة - ${supplier.name}`, memoEn: `Payable - ${supplier.name}` });
+    if (paidCents > 0) {
+      const methodLabel = paymentMethod === 'card' ? 'Bank' : 'Cash';
+      lines.push({ accountId: cashAcctId, debit: '0.00', credit: money.fromCents(paidCents), memo: `دفعة ${methodLabel} - ${supplier.name}`, memoEn: `${methodLabel} paid - ${supplier.name}` });
+    }
+    if (dueCents > 0) {
+      lines.push({ accountId: supplier.account_id, debit: '0.00', credit: money.fromCents(dueCents), memo: `ذمم دائنة - ${supplier.name}`, memoEn: `Payable - ${supplier.name}` });
+    }
 
     await journalService.createEntry(
       {
@@ -137,7 +161,7 @@ const create = async (payload, actor) => {
       action: 'purchase.create',
       entity: 'purchases',
       entityId: purchaseId,
-      description: `Recorded purchase ${purchaseNumber} from ${supplier.name} (total ${money.fromCents(subtotalCents)})`,
+      description: `Recorded purchase ${purchaseNumber} from ${supplier.name} (total ${money.fromCents(subtotalCents)}, paid ${money.fromCents(paidCents)}, due ${money.fromCents(dueCents)})`,
       ip: actor?.ip,
     });
 

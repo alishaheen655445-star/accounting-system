@@ -78,7 +78,9 @@ if (content) {
         </table>
       </div>
       <div class="totals-box">
-        <div class="t-row grand"><span>${escapeHtml(bi('Total', 'الإجمالي', 'مجموع'))}</span><span class="num">${formatMoney(pur.total_amount)}</span></div>
+        <div class="t-row"><span>${escapeHtml(bi('Total', 'الإجمالي', 'مجموع'))}</span><span class="num">${formatMoney(pur.total_amount)}</span></div>
+        <div class="t-row"><span>${escapeHtml(bi('Paid', 'المدفوع', 'پرداخت‌شده'))}</span><span class="num">${formatMoney(pur.amount_paid)}</span></div>
+        <div class="t-row grand"><span>${escapeHtml(bi('Remaining (credit)', 'المتبقي (آجل)', 'مانده (نسیه)'))}</span><span class="num">${formatMoney(Number(pur.total_amount) - Number(pur.amount_paid))}</span></div>
       </div>
       ${pur.notes ? `<p class="muted mt-1">${escapeHtml(pur.notes)}</p>` : ''}`);
   }
@@ -114,8 +116,20 @@ if (content) {
       </table>
       <button type="button" class="btn btn-secondary btn-sm" id="pur-add">+ ${escapeHtml(bi('Add Line', 'إضافة سطر', 'افزودن خط'))}</button>
 
+      <div class="detail-grid" style="margin-top:.75rem">
+        <div class="form-group"><label>${escapeHtml(bi('Paid now', 'المدفوع الآن', 'پرداخت فعلی'))}</label>
+          <input type="number" id="pur-paid" step="0.01" min="0" value="0" placeholder="0.00" /></div>
+        <div class="form-group"><label>${escapeHtml(bi('Payment Method', 'وسيلة الدفع', 'روش پرداخت'))}</label>
+          <select id="pur-method">
+            <option value="cash">${escapeHtml(bi('Cash (Cash on Hand)', 'نقدًا (الصندوق)', 'نقد (صندوق)'))}</option>
+            <option value="card">${escapeHtml(bi('Card (Bank)', 'بطاقة (البنك)', 'کارت (بانک)'))}</option>
+          </select></div>
+      </div>
+
       <div class="totals-box">
-        <div class="t-row grand"><span>${escapeHtml(bi('Total', 'الإجمالي', 'مجموع'))}</span><span class="num" id="pur-total">0.00</span></div>
+        <div class="t-row"><span>${escapeHtml(bi('Total', 'الإجمالي', 'مجموع'))}</span><span class="num" id="pur-total">0.00</span></div>
+        <div class="t-row"><span>${escapeHtml(bi('Paid now', 'المدفوع الآن', 'پرداخت فعلی'))}</span><span class="num" id="pur-paidshow">0.00</span></div>
+        <div class="t-row grand"><span>${escapeHtml(bi('Remaining (credit)', 'المتبقي (آجل)', 'مانده (نسیه)'))}</span><span class="num" id="pur-due">0.00</span></div>
       </div>`,
       submitPurchase
     );
@@ -159,8 +173,14 @@ if (content) {
         tr.querySelector('.li-total').textContent = formatMoney(line);
         sub += line;
       });
+      const paid = Math.max(0, Number(document.getElementById('pur-paid').value) || 0);
+      const capped = Math.min(paid, sub);
       document.getElementById('pur-total').textContent = formatMoney(sub);
+      document.getElementById('pur-paidshow').textContent = formatMoney(capped);
+      document.getElementById('pur-due').textContent = formatMoney(sub - capped);
     }
+
+    document.getElementById('pur-paid').addEventListener('input', recompute);
 
     document.getElementById('pur-add').addEventListener('click', addLine);
     addLine();
@@ -194,6 +214,20 @@ if (content) {
       const payload = { supplierId: Number(supplierId), purchaseDate, items };
       const notes = document.getElementById('pur-notes').value.trim();
       if (notes) payload.notes = notes;
+
+      // Optional pay-at-purchase settlement (validate against the live total).
+      const total = items.reduce((s, it) => {
+        const unit = (it.unitCost !== undefined) ? it.unitCost : (costById[String(it.productId)] || 0);
+        return s + it.quantity * unit;
+      }, 0);
+      const paidVal = Math.max(0, Number(document.getElementById('pur-paid').value) || 0);
+      if (paidVal > total + 0.001) {
+        return fail(bi('Paid amount cannot exceed the purchase total.', 'مبلغ الدفع لا يمكن أن يتجاوز إجمالي الشرائي.', 'مبلغ پرداخت نمی‌تواند بیشتر از مجموع خرید باشد.'));
+      }
+      if (paidVal > 0) {
+        payload.amountPaid = paidVal.toFixed(2);
+        payload.paymentMethod = document.getElementById('pur-method').value || 'cash';
+      }
 
       try {
         await api.post('/purchases', payload);

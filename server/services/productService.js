@@ -5,7 +5,26 @@
 // -----------------------------------------------------------------------------
 const model = require('../models/productModel');
 const audit = require('./auditService');
+const accounts = require('../config/accounting');
 const ApiError = require('../utils/ApiError');
+
+/**
+ * Map a client-supplied product `type` ('goods' | 'service') to the GL accounts.
+ *  - goods   -> Sales Revenue + Inventory account (so it is stock-tracked).
+ *  - service -> Service Revenue, NO inventory account (never stocked/purchased).
+ * When `type` is absent we leave any explicitly-passed account ids untouched.
+ */
+const applyProductType = (data) => {
+  const type = (data.type || '').toString().toLowerCase();
+  if (type === 'goods') {
+    data.revenueAccountId = accounts.SALES_REVENUE_ACCOUNT_ID;
+    data.inventoryAccountId = accounts.INVENTORY_ACCOUNT_ID;
+  } else if (type === 'service') {
+    data.revenueAccountId = accounts.SERVICE_REVENUE_ACCOUNT_ID;
+    data.inventoryAccountId = null;
+  }
+  return data;
+};
 
 const list = async ({ search, isActive, page, pageSize }) => {
   const limit = pageSize;
@@ -34,7 +53,7 @@ const create = async (data, actor) => {
     while (await model.skuExists(sku));
   }
 
-  const id = await model.create({ ...data, sku });
+  const id = await model.create(applyProductType({ ...data, sku }));
   const created = await model.findById(id);
 
   await audit.log({
@@ -59,6 +78,7 @@ const update = async (id, data, actor) => {
   }
 
   const fields = {};
+  applyProductType(data);
   if (data.sku !== undefined) fields.sku = data.sku;
   if (data.name !== undefined) fields.name = data.name;
   if (data.description !== undefined) fields.description = data.description;

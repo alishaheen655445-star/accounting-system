@@ -6,6 +6,8 @@ const { body, param, query } = require('express-validator');
 const createRules = [
   body('supplierId').isInt({ min: 1 }).withMessage('Valid supplierId is required').toInt(),
   body('purchaseDate').isISO8601().withMessage('purchaseDate must be a valid date'),
+  body('amountPaid').optional({ values: 'falsy' }).isFloat({ min: 0 }).withMessage('amountPaid must be >= 0'),
+  body('paymentMethod').optional({ values: 'falsy' }).toLowerCase().isIn(['cash', 'card']).withMessage('paymentMethod must be cash or card'),
   body('notes').optional({ values: 'falsy' }).trim().isLength({ max: 255 }).withMessage('notes too long'),
   body('items').isArray({ min: 1 }).withMessage('At least one line item is required'),
   body('items.*.productId').isInt({ min: 1 }).withMessage('Each purchase line must reference a product').toInt(),
