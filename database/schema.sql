@@ -265,7 +265,7 @@ CREATE TABLE journal_entries (
     entry_date      DATE         NOT NULL,
     description     VARCHAR(255) NOT NULL,                -- Arabic (primary) narration
     description_en  VARCHAR(255) NULL,                    -- English narration (system-generated entries)
-    reference_type  ENUM('manual','invoice','payment','purchase','opening') NOT NULL DEFAULT 'manual',
+    reference_type  ENUM('manual','invoice','payment','purchase','supplier_payment','opening') NOT NULL DEFAULT 'manual',
     reference_id    INT UNSIGNED NULL,                     -- id in the originating table (non-FK, polymorphic)
     created_by      INT UNSIGNED NULL,                     -- FK -> users
     is_posted       TINYINT(1)   NOT NULL DEFAULT 1,       -- draft vs posted to ledger
@@ -334,6 +334,42 @@ CREATE TABLE payments (
         FOREIGN KEY (journal_entry_id) REFERENCES journal_entries (id)
         ON DELETE SET NULL,
     CONSTRAINT fk_payments_created_by
+        FOREIGN KEY (created_by) REFERENCES users (id)
+        ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- =============================================================================
+-- 10b. supplier_payments — money OUT settling a supplier (Accounts Payable).
+--      Mirror of `payments` but for the AP side: Dr Supplier AP / Cr Cash-Bank.
+--      purchase_id links the settlement to a specific purchase (NULL = on-account).
+--      journal_entry_id links the double-entry it generated.
+-- =============================================================================
+CREATE TABLE supplier_payments (
+    id                 INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    payment_number     VARCHAR(30)  NOT NULL,
+    supplier_id        INT UNSIGNED NOT NULL,              -- FK -> suppliers
+    purchase_id        INT UNSIGNED NULL,                  -- FK -> purchases (NULL = on-account payment)
+    amount             DECIMAL(15,2) NOT NULL,
+    payment_date       DATE         NOT NULL,
+    method             ENUM('cash','bank','cheque','card') NOT NULL DEFAULT 'cash',
+    reference          VARCHAR(80)  NULL,                  -- cheque no. / bank ref
+    journal_entry_id   INT UNSIGNED NULL,                  -- FK -> journal_entries created for this
+    created_by         INT UNSIGNED NULL,                  -- FK -> users
+    created_at         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_supplier_payment_number (payment_number),
+    KEY idx_sp_supplier (supplier_id),
+    KEY idx_sp_purchase (purchase_id),
+    CONSTRAINT fk_sp_supplier
+        FOREIGN KEY (supplier_id) REFERENCES suppliers (id)
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_sp_purchase
+        FOREIGN KEY (purchase_id) REFERENCES purchases (id)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_sp_journal
+        FOREIGN KEY (journal_entry_id) REFERENCES journal_entries (id)
+        ON DELETE SET NULL,
+    CONSTRAINT fk_sp_created_by
         FOREIGN KEY (created_by) REFERENCES users (id)
         ON DELETE SET NULL
 ) ENGINE=InnoDB;

@@ -24,6 +24,7 @@ const NAV = [
   { key: 'purchases', label: 'Purchases', ar: 'المشتريات', fa: 'خريد', icon: 'add_shopping_cart', href: 'purchases.html' },
   { key: 'invoices', label: 'Invoices', ar: 'الفواتير والمبيعات', fa: 'فاکتورها', icon: 'description', href: 'invoices.html' },
   { key: 'payments', label: 'Payments', ar: 'الدفعات', fa: 'پرداخت‌ها', icon: 'payments', href: 'payments.html' },
+  { key: 'supplier-payments', label: 'Supplier Payments', ar: 'الدفعات للموردين', fa: 'پرداخت‌های تأمین‌کنندگان', icon: 'local_atm', href: 'supplier-payments.html' },
   { key: 'journal', label: 'Journal', ar: 'قيود اليومية', fa: 'روزنامه', icon: 'receipt_long', href: 'journal.html' },
   { key: 'reports', label: 'Reports', ar: 'التقارير المالية', fa: 'گزارش‌های مالی', icon: 'analytics', href: 'reports.html' },
   { key: 'users', label: 'Users', ar: 'المستخدمون', fa: 'کاربران', icon: 'manage_accounts', href: 'users.html', adminOnly: true },

@@ -22,3 +22,6 @@ docs/_shot_*.png
 
 # Local DB backups (contain data — never commit)
 _db_backup_*.sql
+
+# Temp API smoke-test scripts (throwaway)
+_test_*.ps1
