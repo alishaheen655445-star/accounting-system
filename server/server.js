@@ -5,6 +5,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const cors = require('cors');
 
@@ -26,10 +27,32 @@ const { notFound, errorHandler } = require('./middleware/errorHandler');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// The vanilla-JS client is a static folder. Serving it from Express lets the WHOLE
+// app run as ONE service on ONE origin when deployed (no separate static host, no
+// CORS). It is still overridable via CLIENT_DIR if a host lays files differently.
+const CLIENT_DIR = path.resolve(process.env.CLIENT_DIR || path.join(__dirname, '..', 'client'));
+
 // --- Global middleware -------------------------------------------------------
-app.use(helmet());                 // security headers (req. security list)
+// Security headers, but with a CSP that allows the design-system CDNs the pages
+// rely on: Tailwind Play CDN (scripts + injected styles, uses eval) and Google
+// Fonts. Kept explicit so helmet still protects everything else.
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://cdn.tailwindcss.com'],
+      'style-src': ["'self'", "'unsafe-inline'", 'https://cdn.tailwindcss.com', 'https://fonts.googleapis.com'],
+      'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      'img-src': ["'self'", 'data:'],
+      'connect-src': ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(cors());                   // cross-origin policy (configured per origin later)
 app.use(express.json());           // parse JSON request bodies
+app.use(express.static(CLIENT_DIR)); // serve the frontend (login at '/', assets, *.html)
 
 // --- Health check: proves server + DB are both alive -------------------------
 app.get('/api/health', async (req, res) => {
